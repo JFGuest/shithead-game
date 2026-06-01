@@ -48,6 +48,24 @@
     .counts { color: #6d6258; font-size: 12px; text-align: right; }
     .zone-label { color: #6d6258; font-size: 12px; font-weight: 800; text-transform: uppercase; margin: 8px 0 4px; }
     .row { display: flex; flex-wrap: wrap; gap: 7px; min-height: 76px; align-items: center; }
+    .tableau-row { display: flex; flex-wrap: wrap; gap: 10px; min-height: 92px; align-items: center; }
+    .tableau-slot {
+      position: relative;
+      width: clamp(62px, 16vw, 82px);
+      height: clamp(92px, 23vw, 122px);
+      flex: 0 0 auto;
+    }
+    .tableau-slot .card {
+      position: absolute;
+      width: 82%;
+      left: 0;
+      bottom: 0;
+    }
+    .tableau-slot .face-up-card {
+      left: 12px;
+      bottom: 14px;
+      z-index: 2;
+    }
     .card {
       width: clamp(54px, 14vw, 76px);
       aspect-ratio: 500 / 726;
@@ -78,6 +96,10 @@
       .players { grid-template-columns: 1fr; }
       .player.active { order: -1; }
       .card { width: clamp(58px, 18vw, 78px); }
+      .tableau-slot {
+        width: clamp(68px, 21vw, 88px);
+        height: clamp(104px, 30vw, 130px);
+      }
     }
   </style>
 </head>
@@ -235,25 +257,52 @@
           <div class="name">${player.name}${player.bot ? " (Computer)" : ""}</div>
           <div class="counts">Hand ${player.hand.length} | Up ${player.faceUp.length} | Down ${player.faceDown.length}</div>
         </div>
-        <div class="zone-label">Face Up</div>
-        <div class="row faceUp"></div>
         <div class="zone-label">${playerIndex === state.viewerIndex ? "Hand" : "Hand Count"}</div>
         <div class="row hand"></div>
-        <div class="zone-label">Face Down</div>
-        <div class="row faceDown"></div>
+        <div class="zone-label">Table Cards</div>
+        <div class="tableau-row tableau"></div>
       `;
-      fillRow(section.querySelector(".faceUp"), player.faceUp, playerIndex, "faceUp");
       fillRow(section.querySelector(".hand"), player.hand, playerIndex, "hand");
-      fillRow(section.querySelector(".faceDown"), player.faceDown, playerIndex, "faceDown");
+      fillTableau(section.querySelector(".tableau"), player, playerIndex);
       return section;
+    }
+
+    function fillTableau(row, player, playerIndex) {
+      const length = Math.max(player.faceUp.length, player.faceDown.length);
+      for (let index = 0; index < length; index++) {
+        const slot = document.createElement("div");
+        slot.className = "tableau-slot";
+        const down = player.faceDown[index];
+        const up = player.faceUp[index];
+        if (down) {
+          const downNode = cardBack();
+          if (canSelect(playerIndex, "faceDown")) {
+            downNode.classList.add("selectable");
+            downNode.addEventListener("click", () => selectPlay("faceDown", index, down));
+          }
+          if (isSelected("faceDown", index)) downNode.classList.add("selected");
+          slot.appendChild(downNode);
+        }
+        if (up) {
+          const upNode = cardNode(up);
+          upNode.classList.add("face-up-card");
+          if (canSelect(playerIndex, "faceUp")) {
+            upNode.classList.add("selectable");
+            const handler = isMySetup() ? () => selectSwap("faceUp", index) : () => selectPlay("faceUp", index, up);
+            upNode.addEventListener("click", handler);
+          }
+          if (isSelected("faceUp", index) || isSwapSelected("faceUp", index)) upNode.classList.add("selected");
+          slot.appendChild(upNode);
+        }
+        row.appendChild(slot);
+      }
     }
 
     function fillRow(row, cards, playerIndex, zone) {
       for (const [index, card] of cards.entries()) {
         const node = card.hidden ? cardBack() : cardNode(card);
-        const mine = playerIndex === state.viewerIndex;
-        const selectableSetup = isMySetup() && mine && (zone === "hand" || zone === "faceUp");
-        const selectablePlay = isMyTurn() && mine && zone === me().activeZone;
+        const selectableSetup = canSelect(playerIndex, zone) && isMySetup();
+        const selectablePlay = canSelect(playerIndex, zone) && isMyTurn();
         if (selectableSetup || selectablePlay) {
           node.classList.add("selectable");
           node.addEventListener("click", () => selectableSetup ? selectSwap(zone, index) : selectPlay(zone, index, card));
@@ -261,6 +310,14 @@
         if (isSelected(zone, index) || isSwapSelected(zone, index)) node.classList.add("selected");
         row.appendChild(node);
       }
+    }
+
+    function canSelect(playerIndex, zone) {
+      const mine = playerIndex === state.viewerIndex;
+      if (!mine) return false;
+      if (isMySetup()) return zone === "hand" || zone === "faceUp";
+      if (isMyTurn()) return zone === me().activeZone;
+      return false;
     }
 
     function selectSwap(zone, index) {
