@@ -39,6 +39,26 @@
     .setup { display: grid; gap: 10px; max-width: 520px; margin: 18px auto; }
     .join-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .room-code { font-size: 34px; font-weight: 900; letter-spacing: 4px; }
+    .share-box {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      background: #fff8dc;
+      overflow-wrap: anywhere;
+    }
+    .share-link {
+      font-weight: 800;
+      color: #0f3f2d;
+    }
+    .qr {
+      width: 150px;
+      height: 150px;
+      border-radius: 8px;
+      background: white;
+      justify-self: center;
+    }
     .top { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .players { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
     .player.active { outline: 3px solid #f5c542; }
@@ -125,6 +145,12 @@
       <div>Room code</div>
       <div class="room-code" id="roomCode"></div>
       <div class="message" id="lobbyMessage"></div>
+      <div class="share-box" id="shareBox">
+        <div>Open this on each iPhone:</div>
+        <a class="share-link" id="joinLink" href="#"></a>
+        <img class="qr" id="qrCode" alt="Join room QR code">
+        <button class="secondary" id="copyJoinLink">Copy Join Link</button>
+      </div>
       <div class="actions">
         <button id="addBot">Add Computer</button>
         <button id="startGame">Start Game</button>
@@ -161,6 +187,7 @@
     let state = null;
     let selected = [];
     let swapFirst = null;
+    let networkInfo = null;
 
     const el = {
       setupPanel: document.querySelector("#setupPanel"),
@@ -172,6 +199,9 @@
       lobbyMessage: document.querySelector("#lobbyMessage"),
       nameInput: document.querySelector("#nameInput"),
       roomInput: document.querySelector("#roomInput"),
+      joinLink: document.querySelector("#joinLink"),
+      qrCode: document.querySelector("#qrCode"),
+      copyJoinLink: document.querySelector("#copyJoinLink"),
       drawCount: document.querySelector("#drawCount"),
       pileRow: document.querySelector("#pileRow"),
       pileInfo: document.querySelector("#pileInfo"),
@@ -184,8 +214,41 @@
       startGame: document.querySelector("#startGame")
     };
 
-    document.querySelector("#createRoom").addEventListener("click", () => socket.emit("createRoom", { name: el.nameInput.value }));
-    document.querySelector("#joinRoom").addEventListener("click", () => socket.emit("joinRoom", { code: el.roomInput.value, name: el.nameInput.value }));
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get("room");
+    if (roomParam) {
+      el.roomInput.value = roomParam.slice(0, 4);
+      el.nameInput.focus();
+    }
+
+    fetch("/network-info").then(response => response.json()).then(info => {
+      networkInfo = info;
+      render();
+    }).catch(() => {});
+
+    document.querySelector("#createRoom").addEventListener("click", () => {
+      const name = requireName();
+      if (name) socket.emit("createRoom", { name });
+    });
+    document.querySelector("#joinRoom").addEventListener("click", () => {
+      const name = requireName();
+      if (!name) return;
+      const code = el.roomInput.value.trim();
+      if (!code) {
+        alert("Enter the room code first.");
+        return;
+      }
+      socket.emit("joinRoom", { code, name });
+    });
+    el.copyJoinLink.addEventListener("click", async () => {
+      const link = joinUrl();
+      try {
+        await navigator.clipboard.writeText(link);
+        alert("Join link copied.");
+      } catch {
+        prompt("Copy this join link:", link);
+      }
+    });
     el.addBot.addEventListener("click", () => socket.emit("addBot"));
     el.startGame.addEventListener("click", () => socket.emit("startGame"));
     el.doneSetup.addEventListener("click", () => { swapFirst = null; socket.emit("doneSetup"); });
@@ -202,6 +265,26 @@
       render();
     });
     socket.on("errorMessage", text => alert(text));
+
+    function requireName() {
+      let name = el.nameInput.value.trim();
+      while (!name) {
+        name = prompt("What is your name?")?.trim() || "";
+        if (!name) return "";
+      }
+      el.nameInput.value = name.slice(0, 18);
+      return el.nameInput.value;
+    }
+
+    function baseJoinUrl() {
+      if (networkInfo?.lanUrl && location.hostname === "localhost") return networkInfo.lanUrl;
+      if (networkInfo?.lanUrl && location.hostname === "127.0.0.1") return networkInfo.lanUrl;
+      return location.origin;
+    }
+
+    function joinUrl() {
+      return state ? `${baseJoinUrl()}?room=${encodeURIComponent(state.code)}` : baseJoinUrl();
+    }
 
     function currentPlayer() {
       return state?.players[state.current];
@@ -228,6 +311,10 @@
       el.gameTop.classList.toggle("hidden", state.phase === "lobby");
       el.actionPanel.classList.toggle("hidden", state.phase === "lobby");
       el.lobbyMessage.textContent = `${state.players.length}/4 players. Share code ${state.code}.`;
+      const link = joinUrl();
+      el.joinLink.textContent = link;
+      el.joinLink.href = link;
+      el.qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link)}`;
       el.addBot.disabled = state.viewerId !== state.hostId || state.players.length >= 4;
       el.startGame.disabled = state.viewerId !== state.hostId || state.players.length < 2;
 

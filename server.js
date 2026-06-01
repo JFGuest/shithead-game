@@ -1,5 +1,6 @@
 const express = require("express");
 const http = require("http");
+const os = require("os");
 const path = require("path");
 const { Server } = require("socket.io");
 
@@ -10,6 +11,16 @@ const PORT = process.env.PORT || 3000;
 
 app.get("/", (_req, res) => {
   res.sendFile(path.join(__dirname, "online.html"));
+});
+app.get("/network-info", (req, res) => {
+  const ip = getLocalIPv4();
+  const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  const port = process.env.PORT ? "" : `:${PORT}`;
+  res.json({
+    host: req.headers.host,
+    localUrl: `${protocol}://${req.headers.host}`,
+    lanUrl: ip ? `http://${ip}${port}` : null
+  });
 });
 app.use(express.static(__dirname));
 
@@ -22,6 +33,18 @@ const ranks = [
 ];
 
 const rooms = new Map();
+
+function getLocalIPv4() {
+  const nets = os.networkInterfaces();
+  for (const entries of Object.values(nets)) {
+    for (const entry of entries || []) {
+      if (entry.family === "IPv4" && !entry.internal && !entry.address.startsWith("169.254.")) {
+        return entry.address;
+      }
+    }
+  }
+  return null;
+}
 
 function makeDeck() {
   return ranks.flatMap(([rank, value, label]) => suits.map(suit => ({

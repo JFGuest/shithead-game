@@ -25,6 +25,21 @@ function Test-Server {
   }
 }
 
+function Stop-PortProcess {
+  param([int]$Port)
+  $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+  foreach ($connection in $connections) {
+    $processId = $connection.OwningProcess
+    if ($processId) {
+      $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+      if ($process -and $process.ProcessName -match "node") {
+        Write-Host "Restarting existing Node server on port $Port..."
+        Stop-Process -Id $processId -Force
+      }
+    }
+  }
+}
+
 Set-Location $gameDir
 
 if (-not (Test-Path "$gameDir\node_modules")) {
@@ -32,24 +47,25 @@ if (-not (Test-Path "$gameDir\node_modules")) {
   npm install
 }
 
-if (-not (Test-Server -Port $port)) {
-  Write-Host "Starting Shithead server on port $port..."
-  Start-Process -FilePath "node.exe" -ArgumentList "server.js" -WorkingDirectory $gameDir -WindowStyle Hidden
+if (Test-Server -Port $port) {
+  Stop-PortProcess -Port $port
+  Start-Sleep -Milliseconds 700
+}
 
-  $started = $false
-  for ($i = 0; $i -lt 20; $i++) {
-    Start-Sleep -Milliseconds 500
-    if (Test-Server -Port $port) {
-      $started = $true
-      break
-    }
-  }
+Write-Host "Starting Shithead server on port $port..."
+Start-Process -FilePath "node.exe" -ArgumentList "server.js" -WorkingDirectory $gameDir -WindowStyle Hidden
 
-  if (-not $started) {
-    throw "The server did not start on port $port."
+$started = $false
+for ($i = 0; $i -lt 20; $i++) {
+  Start-Sleep -Milliseconds 500
+  if (Test-Server -Port $port) {
+    $started = $true
+    break
   }
-} else {
-  Write-Host "Shithead server is already running on port $port."
+}
+
+if (-not $started) {
+  throw "The server did not start on port $port."
 }
 
 $ip = Get-LocalIPv4
