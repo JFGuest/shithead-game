@@ -1,0 +1,1239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shithead - 4 Player</title>
+  <style>
+    :root {
+      --felt: #176043;
+      --felt-dark: #0f3f2d;
+      --panel: #f7f2e8;
+      --ink: #211b16;
+      --muted: #6d6258;
+      --line: rgba(33, 27, 22, 0.18);
+      --accent: #f5c542;
+      --danger: #ba3c2f;
+      --ok: #2e8b57;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      margin: 0;
+      height: 100%;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at center, rgba(255,255,255,0.12), transparent 42%),
+        linear-gradient(135deg, var(--felt), var(--felt-dark));
+      overflow: hidden;
+      overflow-anchor: none;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--ink);
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+    }
+
+    button.secondary { background: #e9dfcc; }
+    button.danger { background: #f2a097; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: white;
+      font-weight: 700;
+    }
+
+    select {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--ink);
+      background: #fff7e4;
+      box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+    }
+
+    .app {
+      height: 100vh;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: 50px minmax(0, 1fr) 20px;
+      gap: 6px;
+      padding: 6px;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: white;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 42px);
+      letter-spacing: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .table {
+      display: grid;
+      grid-template-columns: minmax(230px, 0.9fr) minmax(470px, 1.25fr) minmax(230px, 0.9fr);
+      grid-template-rows: minmax(132px, 0.54fr) minmax(230px, 1fr) minmax(150px, 0.64fr);
+      gap: 8px;
+      min-height: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .player {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      padding: 8px;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      align-self: stretch;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.16);
+    }
+
+    .p1,
+    .p3 {
+      align-self: center;
+      min-height: 250px;
+      max-height: 330px;
+    }
+
+    .p2 {
+      align-self: stretch;
+    }
+
+    .p0 {
+      align-self: stretch;
+      overflow: visible;
+    }
+
+    .player.active {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .player.finished {
+      opacity: 0.65;
+    }
+
+    .p0 { grid-column: 2; grid-row: 3; }
+    .p1 { grid-column: 1; grid-row: 2; }
+    .p2 { grid-column: 2; grid-row: 1; }
+    .p3 { grid-column: 3; grid-row: 2; }
+
+    .players-2 .p1 { grid-column: 2; grid-row: 1; }
+    .players-3 .p1 { grid-column: 1; grid-row: 2; }
+    .players-3 .p2 { grid-column: 3; grid-row: 2; }
+
+    .players-2 .center,
+    .players-3 .center {
+      grid-column: 2;
+    }
+
+    .player-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .p0 .player-head {
+      margin-bottom: 4px;
+    }
+
+    .player-name {
+      font-weight: 800;
+      font-size: 16px;
+    }
+
+    .player-counts {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .zones {
+      display: grid;
+      gap: 5px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .zones > div {
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .p0 .zones {
+      grid-template-columns: 1fr 1fr 1fr;
+      align-items: start;
+      overflow: visible;
+    }
+
+    .p1 .zones,
+    .p2 .zones,
+    .p3 .zones {
+      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .p0 .row {
+      min-height: 86px;
+    }
+
+    .p1 .row,
+    .p2 .row,
+    .p3 .row {
+      min-height: 44px;
+    }
+
+    .zone-label {
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      min-height: 50px;
+      overflow: visible;
+    }
+
+    .card {
+      width: clamp(42px, 4.4vw, 64px);
+      aspect-ratio: 500 / 726;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,0.16);
+      background: white;
+      object-fit: contain;
+      flex: 0 0 auto;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.23);
+      transition: transform 130ms ease, box-shadow 130ms ease, opacity 130ms ease;
+      user-select: none;
+    }
+
+    .p0 .card {
+      width: clamp(52px, 4.9vw, 76px);
+    }
+
+    .card.playable {
+      cursor: pointer;
+    }
+
+    .card.playable:hover,
+    .card.selected {
+      transform: translateY(-7px);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.28);
+    }
+
+    .card.selected {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .card.unplayable {
+      opacity: 0.45;
+      filter: grayscale(0.35);
+    }
+
+    .back {
+      display: grid;
+      place-items: center;
+      color: white;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,0.12) 25%, transparent 25% 50%, rgba(255,255,255,0.12) 50% 75%, transparent 75%),
+        #245a9b;
+      background-size: 14px 14px;
+      font-weight: 900;
+      text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+    }
+
+    .center {
+      grid-column: 2;
+      grid-row: 2;
+      align-self: stretch;
+      background: rgba(255,255,255,0.88);
+      border-radius: 8px;
+      padding: 8px;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.2);
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) 40px 58px;
+      gap: 6px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .piles {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      align-items: stretch;
+      margin-bottom: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pile {
+      min-height: 0;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 6px;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .pile-title {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .pile-value {
+      font-weight: 800;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      margin-bottom: 0;
+    }
+
+    .message {
+      height: 58px;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff8dc;
+      line-height: 1.35;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .rules {
+      color: white;
+      font-size: 13px;
+      opacity: 0.95;
+      text-align: center;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(12, 42, 31, 0.9);
+    }
+
+    .overlay.hidden {
+      display: none;
+    }
+
+    .dialog {
+      width: min(640px, 96vw);
+      border-radius: 8px;
+      padding: 18px;
+      background: #f7f2e8;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+    }
+
+    .dialog h2 {
+      margin: 0 0 12px;
+      font-size: 26px;
+    }
+
+    .dialog p {
+      margin: 0 0 14px;
+      color: var(--muted);
+    }
+
+    .config-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 150px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .config-row input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: inherit;
+      background: white;
+    }
+
+    .config-row label {
+      color: var(--ink);
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .pass-name {
+      margin: 8px 0 16px;
+      font-size: 34px;
+      font-weight: 900;
+    }
+
+    @media (max-width: 640px) {
+      html,
+      body {
+        height: auto;
+        overflow: auto;
+      }
+
+      .table {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+      }
+
+      .p0, .p1, .p2, .p3, .center {
+        grid-column: 1;
+        grid-row: auto;
+      }
+
+      .center { order: -1; }
+      .player { min-height: 0; overflow: visible; }
+      .p0 .zones { grid-template-columns: 1fr; }
+      .app { overflow: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay" id="configOverlay">
+    <section class="dialog">
+      <h2>Set Up Players</h2>
+      <p>Choose 2-4 players. Each seat can be human or computer, and human players can pass the PC between turns.</p>
+      <div class="config-row">
+        <label for="configPlayerCount">Players</label>
+        <select id="configPlayerCount">
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4" selected>4</option>
+        </select>
+        <span></span>
+      </div>
+      <div id="playerConfigRows"></div>
+      <div class="dialog-actions">
+        <button id="dealGame">Deal Cards</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="overlay hidden" id="passOverlay">
+    <section class="dialog">
+      <h2 id="passTitle">Pass the PC</h2>
+      <p>Hands are hidden until the next player is ready.</p>
+      <div class="pass-name" id="passName"></div>
+      <div class="dialog-actions">
+        <button id="readyPlayer">Ready</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="app">
+    <header>
+      <h1>Shithead</h1>
+      <div class="toolbar">
+        <label for="playerCount">Players
+          <select id="playerCount">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4" selected>4</option>
+          </select>
+        </label>
+        <button id="newGame">New Game</button>
+        <button id="help" class="secondary">Rules</button>
+      </div>
+    </header>
+
+    <main class="table" id="table">
+      <section class="center">
+        <div class="piles">
+          <div class="pile">
+            <div class="pile-title">Draw Deck</div>
+            <div class="card back" id="drawCard">SH</div>
+            <div class="pile-value" id="drawCount">0 cards</div>
+          </div>
+          <div class="pile">
+            <div class="pile-title">Discard Pile</div>
+            <div id="topCardSlot"></div>
+            <div class="pile-value" id="pileInfo">Empty</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="startPlay" disabled>Start Play</button>
+          <button id="playSelected" disabled>Play Selected</button>
+          <button id="pickupPile" class="danger" disabled>Pick Up Pile</button>
+        </div>
+        <div class="message" id="message"></div>
+      </section>
+    </main>
+
+    <footer class="rules">
+      Choose 2-4 total players. Special cards: 2 resets the pile, 10 removes the pile. Four of a kind also clears. No 7 or 8 special rules.
+    </footer>
+  </div>
+
+  <script>
+    const suits = ["clubs", "diamonds", "hearts", "spades"];
+    const ranks = [
+      ["2", 2, "2"],
+      ["3", 3, "3"],
+      ["4", 4, "4"],
+      ["5", 5, "5"],
+      ["6", 6, "6"],
+      ["7", 7, "7"],
+      ["8", 8, "8"],
+      ["9", 9, "9"],
+      ["10", 10, "10"],
+      ["jack", 11, "J"],
+      ["queen", 12, "Q"],
+      ["king", 13, "K"],
+      ["ace", 14, "A"]
+    ];
+
+    const state = {
+      players: [],
+      draw: [],
+      pile: [],
+      current: 0,
+      selected: [],
+      swapSelection: null,
+      message: "",
+      starterMessage: "",
+      gameOver: false,
+      setup: true,
+      setupIndex: 0,
+      passNeeded: false,
+      passMode: "turn",
+      passPlayer: 0,
+      lastHumanPlayer: null,
+      awaitingHuman: false
+    };
+
+    const el = {
+      configOverlay: document.querySelector("#configOverlay"),
+      passOverlay: document.querySelector("#passOverlay"),
+      playerConfigRows: document.querySelector("#playerConfigRows"),
+      dealGame: document.querySelector("#dealGame"),
+      passTitle: document.querySelector("#passTitle"),
+      passName: document.querySelector("#passName"),
+      readyPlayer: document.querySelector("#readyPlayer"),
+      configPlayerCount: document.querySelector("#configPlayerCount"),
+      table: document.querySelector("#table"),
+      drawCount: document.querySelector("#drawCount"),
+      drawCard: document.querySelector("#drawCard"),
+      topCardSlot: document.querySelector("#topCardSlot"),
+      pileInfo: document.querySelector("#pileInfo"),
+      message: document.querySelector("#message"),
+      startPlay: document.querySelector("#startPlay"),
+      playSelected: document.querySelector("#playSelected"),
+      pickupPile: document.querySelector("#pickupPile"),
+      playerCount: document.querySelector("#playerCount"),
+      newGame: document.querySelector("#newGame"),
+      help: document.querySelector("#help")
+    };
+
+    function makeDeck() {
+      return ranks.flatMap(([rank, value, label]) => suits.map(suit => ({
+        id: `${rank}_of_${suit}`,
+        rank,
+        value,
+        label,
+        suit,
+        img: `cards/${rank}_of_${suit}.png`
+      })));
+    }
+
+    function shuffle(cards) {
+      const deck = [...cards];
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+      return deck;
+    }
+
+    function showConfig() {
+      state.passNeeded = false;
+      state.awaitingHuman = false;
+      el.passOverlay.classList.add("hidden");
+      renderPlayerConfigRows();
+      el.configOverlay.classList.remove("hidden");
+    }
+
+    function renderPlayerConfigRows() {
+      const count = Number(el.configPlayerCount.value);
+      el.playerCount.value = el.configPlayerCount.value;
+      el.playerConfigRows.innerHTML = "";
+      for (let i = 0; i < count; i++) {
+        const row = document.createElement("div");
+        row.className = "config-row";
+        row.innerHTML = `
+          <label>Player ${i + 1}</label>
+          <input id="playerName${i}" value="${i === 0 ? "You" : `Player ${i + 1}`}" maxlength="18">
+          <select id="playerType${i}">
+            <option value="human"${i === 0 ? " selected" : ""}>Human</option>
+            <option value="computer"${i !== 0 ? " selected" : ""}>Computer</option>
+          </select>
+        `;
+        el.playerConfigRows.appendChild(row);
+      }
+    }
+
+    function readPlayerConfig() {
+      const count = Number(el.configPlayerCount.value);
+      return Array.from({ length: count }, (_, i) => {
+        const name = document.querySelector(`#playerName${i}`).value.trim() || `Player ${i + 1}`;
+        const type = document.querySelector(`#playerType${i}`).value;
+        return { name, human: type === "human" };
+      });
+    }
+
+    function startGame() {
+      const deck = shuffle(makeDeck());
+      const config = readPlayerConfig();
+      if (!config.some(player => player.human)) {
+        alert("Choose at least one human player.");
+        return;
+      }
+      state.players = config.map(player => ({
+        name: player.name,
+        human: player.human,
+        hand: [],
+        faceUp: [],
+        faceDown: [],
+        finished: false
+      }));
+
+      for (const player of state.players) {
+        player.faceDown = deck.splice(0, 3);
+        player.faceUp = deck.splice(0, 3);
+        player.hand = sortCards(deck.splice(0, 3));
+      }
+
+      state.draw = deck;
+      state.pile = [];
+      state.current = 0;
+      state.selected = [];
+      state.swapSelection = null;
+      state.starterMessage = "";
+      state.gameOver = false;
+      state.setup = true;
+      state.setupIndex = -1;
+      state.passNeeded = false;
+      state.lastHumanPlayer = null;
+      state.awaitingHuman = false;
+      el.configOverlay.classList.add("hidden");
+      setMessage("Setup: human players can swap hand cards with face-up cards.");
+      render();
+      beginSetup();
+    }
+
+    function beginSetup() {
+      const firstHuman = state.players.findIndex(player => player.human);
+      if (firstHuman === -1) {
+        startPlay();
+        return;
+      }
+      state.setupIndex = firstHuman;
+      showPass(firstHuman, "setup");
+    }
+
+    function sortCards(cards) {
+      return [...cards].sort((a, b) => a.value - b.value || a.suit.localeCompare(b.suit));
+    }
+
+    function activeZone(player) {
+      if (player.hand.length) return "hand";
+      if (player.faceUp.length) return "faceUp";
+      return "faceDown";
+    }
+
+    function topCard() {
+      return state.pile[state.pile.length - 1] || null;
+    }
+
+    function canPlayCard(card) {
+      const top = topCard();
+      if (!top) return true;
+      if (card.rank === "2" || card.rank === "10") return true;
+      if (top.rank === "2") return true;
+      return card.value >= top.value;
+    }
+
+    function legalCards(player) {
+      const zone = activeZone(player);
+      if (zone === "faceDown") return player.faceDown.map((card, index) => ({ card, zone, index }));
+      return player[zone]
+        .map((card, index) => ({ card, zone, index }))
+        .filter(item => canPlayCard(item.card));
+    }
+
+    function drawUp(player) {
+      while (player.hand.length < 3 && state.draw.length) {
+        player.hand.push(state.draw.shift());
+      }
+      player.hand = sortCards(player.hand);
+    }
+
+    function removeCards(player, zone, selectedItems) {
+      const indexes = selectedItems.map(item => item.index).sort((a, b) => b - a);
+      const removed = [];
+      for (const index of indexes) {
+        removed.unshift(player[zone].splice(index, 1)[0]);
+      }
+      return removed;
+    }
+
+    function playCards(playerIndex, selectedItems, blind = false) {
+      const player = state.players[playerIndex];
+      const zone = selectedItems[0].zone;
+      const cards = removeCards(player, zone, selectedItems);
+      const wasLegal = canPlayCard(cards[0]);
+      state.pile.push(...cards);
+
+      const first = cards[0];
+      if (blind && !wasLegal) {
+        player.hand.push(...state.pile.splice(0));
+        player.hand = sortCards(player.hand);
+        setMessage(`${player.name} flipped ${first.label} and had to pick up the pile.`);
+        endTurn(true);
+        return;
+      }
+
+      if (first.rank === "10") {
+        state.pile = [];
+        setMessage(`${player.name} played ${cardsText(cards)}. 10 removes the pile, so ${player.name} goes again.`);
+        drawUp(player);
+        checkFinished(player);
+        if (player.finished && !state.gameOver) state.current = nextPlayer(playerIndex);
+        render();
+        setTimeout(runTurn, player.human ? 0 : 750);
+        return;
+      }
+
+      if (topFourMatch()) {
+        state.pile = [];
+        setMessage(`${player.name} completed four ${first.label}s. The pile is cleared and ${player.name} goes again.`);
+        drawUp(player);
+        checkFinished(player);
+        if (player.finished && !state.gameOver) state.current = nextPlayer(playerIndex);
+        render();
+        setTimeout(runTurn, player.human ? 0 : 750);
+        return;
+      }
+
+      setMessage(`${player.name} played ${cardsText(cards)}.`);
+      drawUp(player);
+      checkFinished(player);
+      endTurn(true);
+    }
+
+    function pickUp(playerIndex) {
+      const player = state.players[playerIndex];
+      player.hand.push(...state.pile.splice(0));
+      player.hand = sortCards(player.hand);
+      setMessage(`${player.name} picked up the pile.`);
+      endTurn(true);
+    }
+
+    function topFourMatch() {
+      if (state.pile.length < 4) return false;
+      const topCards = state.pile.slice(-4);
+      return topCards.every(card => card.rank === topCards[0].rank);
+    }
+
+    function checkFinished(player) {
+      if (!player.finished && !player.hand.length && !player.faceUp.length && !player.faceDown.length) {
+        player.finished = true;
+        setMessage(`${player.name} is out!`);
+      }
+      const active = state.players.filter(p => !p.finished);
+      if (active.length === 1) {
+        state.gameOver = true;
+        setMessage(`${active[0].name} is the shithead. Game over.`);
+      }
+    }
+
+    function endTurn(advance) {
+      if (state.gameOver) {
+        render();
+        return;
+      }
+      if (advance) state.current = nextPlayer(state.current);
+      render();
+      setTimeout(runTurn, state.players[state.current].human ? 0 : 800);
+    }
+
+    function nextPlayer(from) {
+      let index = from;
+      do {
+        index = (index + 1) % state.players.length;
+      } while (state.players[index].finished);
+      return index;
+    }
+
+    function runTurn() {
+      if (state.gameOver) return;
+      const player = state.players[state.current];
+      state.selected = [];
+      state.awaitingHuman = false;
+      render();
+      if (player.human) {
+        if (state.lastHumanPlayer === state.current) {
+          startHumanTurn();
+        } else {
+          showPass(state.current, "turn");
+        }
+        return;
+      }
+      computerMove();
+    }
+
+    function startHumanTurn() {
+      const player = state.players[state.current];
+      state.awaitingHuman = true;
+      state.passNeeded = false;
+      state.lastHumanPlayer = state.current;
+      el.passOverlay.classList.add("hidden");
+      render();
+      if (player.human) {
+        const legal = legalCards(player);
+        if (!legal.length && state.pile.length) {
+          setMessage(`${consumeStarterMessage()}No legal cards. Pick up the pile.`);
+        } else if (activeZone(player) === "faceDown") {
+          setMessage(`${consumeStarterMessage()}Choose a face-down card. It will be flipped blind.`);
+        } else {
+          setMessage(`${consumeStarterMessage()}Your turn. Select one card, or several of the same rank, then play.`);
+        }
+        render();
+        return;
+      }
+    }
+
+    function showPass(playerIndex, mode) {
+      state.passNeeded = true;
+      state.passMode = mode;
+      state.passPlayer = playerIndex;
+      state.awaitingHuman = false;
+      el.passTitle.textContent = mode === "setup" ? "Pass for setup" : "Pass for turn";
+      el.passName.textContent = state.players[playerIndex].name;
+      el.passOverlay.classList.remove("hidden");
+      render();
+    }
+
+    function readyPlayer() {
+      if (!state.passNeeded) return;
+      const player = state.players[state.passPlayer];
+      state.passNeeded = false;
+      el.passOverlay.classList.add("hidden");
+      if (state.passMode === "setup") {
+        state.setupIndex = state.passPlayer;
+        setMessage(`${player.name}: swap cards between your hand and face-up cards, then press the yellow setup button.`);
+        render();
+        return;
+      }
+      startHumanTurn();
+    }
+
+    function consumeStarterMessage() {
+      const message = state.starterMessage;
+      state.starterMessage = "";
+      return message;
+    }
+
+    function computerMove() {
+      const player = state.players[state.current];
+      const zone = activeZone(player);
+      const legal = legalCards(player);
+      if (!legal.length) {
+        pickUp(state.current);
+        return;
+      }
+
+      let chosen;
+      if (zone === "faceDown") {
+        chosen = [legal[0]];
+        playCards(state.current, chosen, true);
+        return;
+      }
+
+      const best = legal
+        .sort((a, b) => scoreComputerCard(a.card) - scoreComputerCard(b.card))[0];
+      chosen = player[zone]
+        .map((card, index) => ({ card, zone, index }))
+        .filter(item => item.card.rank === best.card.rank && canPlayCard(item.card));
+      playCards(state.current, chosen);
+    }
+
+    function scoreComputerCard(card) {
+      if (card.rank === "10") return 100;
+      if (card.rank === "2") return 90;
+      return card.value;
+    }
+
+    function cardsText(cards) {
+      return cards.map(card => `${card.label}${suitSymbol(card.suit)}`).join(", ");
+    }
+
+    function suitSymbol(suit) {
+      return { clubs: "C", diamonds: "D", hearts: "H", spades: "S" }[suit];
+    }
+
+    function setMessage(text) {
+      state.message = `${consumeStarterMessage()}${text}`;
+    }
+
+    function selectCard(zone, index) {
+      const player = state.players[state.current];
+      if (state.setup) {
+        selectSwapCard(zone, index);
+        return;
+      }
+      if (!state.awaitingHuman || state.gameOver) return;
+      if (zone !== activeZone(player)) return;
+
+      const item = { zone, index, card: player[zone][index] };
+      if (zone !== "faceDown" && !canPlayCard(item.card)) return;
+
+      if (zone === "faceDown") {
+        state.selected = [item];
+        render();
+        return;
+      }
+
+      const existing = state.selected.find(sel => sel.zone === zone && sel.index === index);
+      if (existing) {
+        state.selected = state.selected.filter(sel => !(sel.zone === zone && sel.index === index));
+      } else if (!state.selected.length || state.selected[0].card.rank === item.card.rank) {
+        state.selected.push(item);
+      } else {
+        state.selected = [item];
+      }
+      render();
+    }
+
+    function selectSwapCard(zone, index) {
+      if (state.passNeeded || state.setupIndex < 0) return;
+      const player = state.players[state.setupIndex];
+      if (zone !== "hand" && zone !== "faceUp") return;
+      const current = { zone, index, card: player[zone][index] };
+
+      if (!state.swapSelection) {
+        state.swapSelection = current;
+        setMessage(`Selected ${current.card.label}${suitSymbol(current.card.suit)}. Choose a card in the other row to swap it with.`);
+        render();
+        return;
+      }
+
+      if (state.swapSelection.zone === zone && state.swapSelection.index === index) {
+        state.swapSelection = null;
+        setMessage("Setup: swap cards between your hand and face-up cards. Put your best cards face up, then start play.");
+        render();
+        return;
+      }
+
+      if (state.swapSelection.zone === zone) {
+        state.swapSelection = current;
+        setMessage(`Selected ${current.card.label}${suitSymbol(current.card.suit)}. Choose a card in the other row to swap it with.`);
+        render();
+        return;
+      }
+
+      const first = state.swapSelection;
+      const second = current;
+      [player[first.zone][first.index], player[second.zone][second.index]] =
+        [player[second.zone][second.index], player[first.zone][first.index]];
+      player.hand = sortCards(player.hand);
+      state.swapSelection = null;
+      setMessage("Swapped. Keep swapping, or press Start Play when your face-up cards are set.");
+      render();
+    }
+
+    function startPlay() {
+      if (!state.setup) return;
+      if (state.setupIndex >= 0) {
+        const nextHuman = state.players.findIndex((player, index) => player.human && index > state.setupIndex);
+        if (nextHuman !== -1) {
+          state.swapSelection = null;
+          state.setupIndex = nextHuman;
+          showPass(nextHuman, "setup");
+          return;
+        }
+      }
+      state.setup = false;
+      state.setupIndex = -1;
+      state.swapSelection = null;
+      state.current = findStartingPlayer();
+      state.starterMessage = `${state.players[state.current].name} starts with the lowest hand. 3 is low; 2 is special. `;
+      render();
+      runTurn();
+    }
+
+    function findStartingPlayer() {
+      let bestIndex = 0;
+      let bestCards = startingCards(state.players[0]);
+      for (let i = 1; i < state.players.length; i++) {
+        const cards = startingCards(state.players[i]);
+        if (compareStartingHands(cards, bestCards) < 0) {
+          bestIndex = i;
+          bestCards = cards;
+        }
+      }
+      return bestIndex;
+    }
+
+    function startingCards(player) {
+      return sortCards(player.hand)
+        .map(card => card.rank === "2" ? 99 : card.value)
+        .sort((a, b) => a - b);
+    }
+
+    function compareStartingHands(a, b) {
+      const length = Math.max(a.length, b.length);
+      for (let i = 0; i < length; i++) {
+        const left = a[i] ?? 99;
+        const right = b[i] ?? 99;
+        if (left !== right) return left - right;
+      }
+      return 0;
+    }
+
+    function humanPlay() {
+      if (!state.selected.length) return;
+      const blind = state.selected[0].zone === "faceDown";
+      playCards(state.current, state.selected, blind);
+    }
+
+    function humanPickup() {
+      if (!state.awaitingHuman || !state.pile.length) return;
+      if (legalCards(state.players[state.current]).length) {
+        setMessage("You have a playable card, so you must play.");
+        render();
+        return;
+      }
+      pickUp(state.current);
+    }
+
+    function render() {
+      el.table.classList.remove("players-2", "players-3", "players-4");
+      el.table.classList.add(`players-${state.players.length || Number(el.configPlayerCount.value)}`);
+      document.querySelectorAll(".player").forEach(node => node.remove());
+      state.players.forEach((player, index) => {
+        el.table.appendChild(renderPlayer(player, index));
+      });
+
+      el.drawCount.textContent = `${state.draw.length} card${state.draw.length === 1 ? "" : "s"}`;
+      el.drawCard.style.visibility = state.draw.length ? "visible" : "hidden";
+
+      el.topCardSlot.innerHTML = "";
+      const top = topCard();
+      if (top) {
+        el.topCardSlot.appendChild(cardImage(top));
+        el.pileInfo.textContent = `${state.pile.length} in pile. Top: ${top.label}${suitSymbol(top.suit)}`;
+      } else {
+        el.topCardSlot.innerHTML = "<div class=\"card back\">Clear</div>";
+        el.pileInfo.textContent = "Empty";
+      }
+
+      el.message.textContent = state.message;
+      el.startPlay.disabled = !state.setup;
+      el.startPlay.textContent = setupHasMoreHumans() ? "Done Setup" : "Start Play";
+      el.startPlay.style.display = state.setup && !state.passNeeded ? "inline-block" : "none";
+      el.playSelected.disabled = !(state.awaitingHuman && state.selected.length);
+      el.playSelected.style.display = state.setup ? "none" : "inline-block";
+      const activePlayer = state.players[state.current];
+      const humanCanPickUp = state.awaitingHuman && activePlayer && state.pile.length && !legalCards(activePlayer).length;
+      el.pickupPile.disabled = !humanCanPickUp;
+      el.pickupPile.style.display = state.setup ? "none" : "inline-block";
+    }
+
+    function setupHasMoreHumans() {
+      if (!state.setup) return false;
+      return state.players.some((player, index) => player.human && index > state.setupIndex);
+    }
+
+    function renderPlayer(player, index) {
+      const section = document.createElement("section");
+      section.className = `player p${index}`;
+      const activeIndex = state.setup ? state.setupIndex : state.current;
+      if (index === activeIndex && !state.gameOver && !state.passNeeded) section.classList.add("active");
+      if (player.finished) section.classList.add("finished");
+
+      const active = activeZone(player);
+      section.innerHTML = `
+        <div class="player-head">
+          <div class="player-name">${player.name}</div>
+          <div class="player-counts">Hand ${player.hand.length} | Up ${player.faceUp.length} | Down ${player.faceDown.length}</div>
+        </div>
+        <div class="zones">
+          <div>
+            <div class="zone-label">Face up</div>
+            <div class="row face-up"></div>
+          </div>
+          <div>
+            <div class="zone-label">${player.human ? "Hand" : "Hand count"}</div>
+            <div class="row hand"></div>
+          </div>
+          <div>
+            <div class="zone-label">Face down</div>
+            <div class="row face-down"></div>
+          </div>
+        </div>
+      `;
+
+      const faceUpRow = section.querySelector(".face-up");
+      const handRow = section.querySelector(".hand");
+      const faceDownRow = section.querySelector(".face-down");
+
+      player.faceUp.forEach((card, cardIndex) => {
+        faceUpRow.appendChild(renderCardForPlayer(player, index, "faceUp", card, cardIndex, active));
+      });
+
+      if (player.human && canSeeHumanHand(index)) {
+        player.hand.forEach((card, cardIndex) => {
+          handRow.appendChild(renderCardForPlayer(player, index, "hand", card, cardIndex, active));
+        });
+      } else {
+        for (let i = 0; i < player.hand.length; i++) handRow.appendChild(cardBack());
+      }
+
+      player.faceDown.forEach((card, cardIndex) => {
+        const node = cardBack();
+        if (player.human && canSeeHumanHand(index) && !state.setup && active === "faceDown" && index === state.current) {
+          node.classList.add("playable");
+          node.addEventListener("click", () => selectCard("faceDown", cardIndex));
+        }
+        if (state.selected.some(sel => sel.zone === "faceDown" && sel.index === cardIndex)) {
+          node.classList.add("selected");
+        }
+        faceDownRow.appendChild(node);
+      });
+
+      return section;
+    }
+
+    function renderCardForPlayer(player, playerIndex, zone, card, index, active) {
+      const node = cardImage(card);
+      if (state.setup && player.human && playerIndex === state.setupIndex && !state.passNeeded && (zone === "hand" || zone === "faceUp")) {
+        node.classList.add("playable");
+        if (state.swapSelection && state.swapSelection.zone === zone && state.swapSelection.index === index) {
+          node.classList.add("selected");
+        }
+        node.addEventListener("click", () => selectCard(zone, index));
+        return node;
+      }
+      const isHumanTurn = player.human && playerIndex === state.current && state.awaitingHuman && zone === active;
+      const selected = state.selected.some(sel => sel.zone === zone && sel.index === index);
+
+      if (isHumanTurn && canPlayCard(card)) {
+        node.classList.add("playable");
+        node.addEventListener("click", () => selectCard(zone, index));
+      } else if (isHumanTurn) {
+        node.classList.add("unplayable");
+      }
+
+      if (selected) node.classList.add("selected");
+      return node;
+    }
+
+    function canSeeHumanHand(playerIndex) {
+      if (!state.players[playerIndex].human || state.passNeeded) return false;
+      if (state.setup) return playerIndex === state.setupIndex;
+      return state.awaitingHuman && playerIndex === state.current;
+    }
+
+    function cardImage(card) {
+      const img = document.createElement("img");
+      img.className = "card";
+      img.src = card.img;
+      img.alt = `${card.rank} of ${card.suit}`;
+      img.draggable = false;
+      return img;
+    }
+
+    function cardBack() {
+      const div = document.createElement("div");
+      div.className = "card back";
+      div.textContent = "SH";
+      return div;
+    }
+
+    el.startPlay.addEventListener("click", startPlay);
+    el.playSelected.addEventListener("click", humanPlay);
+    el.pickupPile.addEventListener("click", humanPickup);
+    el.newGame.addEventListener("click", showConfig);
+    el.dealGame.addEventListener("click", startGame);
+    el.readyPlayer.addEventListener("click", readyPlayer);
+    el.playerCount.addEventListener("change", () => {
+      el.configPlayerCount.value = el.playerCount.value;
+      showConfig();
+    });
+    el.configPlayerCount.addEventListener("change", renderPlayerConfigRows);
+    el.help.addEventListener("click", () => {
+      alert("Rules in this build:\\n\\n- Choose 2, 3, or 4 total players.\\n- Play equal or higher than the top discard card.\\n- You must play if you can; pick up only if you cannot play.\\n- 2 resets the pile and can be played any time.\\n- 10 removes the pile and can be played any time. The same player goes again.\\n- Four of a kind clears the pile and the same player goes again.\\n- No 7 or 8 special rules.\\n- Draw back up to 3 cards while the draw deck has cards.\\n- Then play face-up cards, then blind face-down cards.\\n- Last player with cards is the shithead.");
+    });
+
+    showConfig();
+  </script>
+</body>
+</html>
