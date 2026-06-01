@@ -374,9 +374,13 @@
           const upNode = cardNode(up);
           upNode.classList.add("face-up-card");
           if (canSelect(playerIndex, "faceUp")) {
-            upNode.classList.add("selectable");
-            const handler = isMySetup() ? () => selectSwap("faceUp", index) : () => selectPlay("faceUp", index, up);
-            upNode.addEventListener("click", handler);
+            if (isMyTurn() && !canPlayCard(up)) {
+              upNode.classList.add("dim");
+            } else {
+              upNode.classList.add("selectable");
+              const handler = isMySetup() ? () => selectSwap("faceUp", index) : () => selectPlay("faceUp", index, up);
+              upNode.addEventListener("click", handler);
+            }
           }
           if (isSelected("faceUp", index) || isSwapSelected("faceUp", index)) upNode.classList.add("selected");
           slot.appendChild(upNode);
@@ -391,8 +395,12 @@
         const selectableSetup = canSelect(playerIndex, zone) && isMySetup();
         const selectablePlay = canSelect(playerIndex, zone) && isMyTurn();
         if (selectableSetup || selectablePlay) {
-          node.classList.add("selectable");
-          node.addEventListener("click", () => selectableSetup ? selectSwap(zone, index) : selectPlay(zone, index, card));
+          if (selectablePlay && zone !== "faceDown" && !canPlayCard(card)) {
+            node.classList.add("dim");
+          } else {
+            node.classList.add("selectable");
+            node.addEventListener("click", () => selectableSetup ? selectSwap(zone, index) : selectPlay(zone, index, card));
+          }
         }
         if (isSelected(zone, index) || isSwapSelected(zone, index)) node.classList.add("selected");
         row.appendChild(node);
@@ -405,6 +413,15 @@
       if (isMySetup()) return zone === "hand" || zone === "faceUp";
       if (isMyTurn()) return zone === me().activeZone;
       return false;
+    }
+
+    function canPlayCard(card) {
+      if (!card || card.hidden) return false;
+      const top = state?.topCard;
+      if (!top) return true;
+      if (card.rank === "2" || card.rank === "10") return true;
+      if (top.rank === "2") return true;
+      return card.value >= top.value;
     }
 
     function selectSwap(zone, index) {
