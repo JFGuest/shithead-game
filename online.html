@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shithead Online</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #211b16;
+      background: #0f3f2d;
+    }
+    button, input {
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: inherit;
+      font-weight: 700;
+    }
+    button { background: #f5c542; cursor: pointer; }
+    button.secondary { background: #e9dfcc; }
+    button.danger { background: #f2a097; }
+    button:disabled { opacity: 0.45; }
+    input { width: 100%; background: white; border: 1px solid rgba(33,27,22,0.18); }
+    .app { padding: 10px; max-width: 1100px; margin: 0 auto; }
+    header { color: white; display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+    h1 { margin: 0; font-size: 32px; }
+    .panel {
+      background: rgba(255,255,255,0.92);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.16);
+    }
+    .setup { display: grid; gap: 10px; max-width: 520px; margin: 18px auto; }
+    .join-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .room-code { font-size: 34px; font-weight: 900; letter-spacing: 4px; }
+    .top { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .players { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+    .player.active { outline: 3px solid #f5c542; }
+    .player.me { border: 2px solid #2e8b57; }
+    .player-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .name { font-weight: 900; }
+    .counts { color: #6d6258; font-size: 12px; text-align: right; }
+    .zone-label { color: #6d6258; font-size: 12px; font-weight: 800; text-transform: uppercase; margin: 8px 0 4px; }
+    .row { display: flex; flex-wrap: wrap; gap: 7px; min-height: 76px; align-items: center; }
+    .card {
+      width: clamp(54px, 14vw, 76px);
+      aspect-ratio: 500 / 726;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,0.16);
+      background: white;
+      object-fit: contain;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.23);
+      flex: 0 0 auto;
+    }
+    .card.selectable { cursor: pointer; }
+    .card.selected { outline: 3px solid #f5c542; transform: translateY(-5px); }
+    .card.dim { opacity: 0.45; filter: grayscale(0.3); }
+    .back {
+      display: grid;
+      place-items: center;
+      color: white;
+      background: linear-gradient(45deg, rgba(255,255,255,0.12) 25%, transparent 25% 50%, rgba(255,255,255,0.12) 50% 75%, transparent 75%), #245a9b;
+      background-size: 14px 14px;
+      font-weight: 900;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
+    .message { background: #fff8dc; border-radius: 8px; padding: 10px; min-height: 44px; text-align: center; }
+    .hidden { display: none; }
+    @media (max-width: 760px) {
+      header { display: block; }
+      .top, .join-row { grid-template-columns: 1fr; }
+      .players { grid-template-columns: 1fr; }
+      .player.active { order: -1; }
+      .card { width: clamp(58px, 18vw, 78px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Shithead Online</h1>
+      <div id="roomBadge"></div>
+    </header>
+
+    <section class="panel setup" id="setupPanel">
+      <h2>Create or Join a Game</h2>
+      <input id="nameInput" placeholder="Your name" maxlength="18">
+      <button id="createRoom">Create Room</button>
+      <div class="join-row">
+        <input id="roomInput" placeholder="Room code" inputmode="numeric" maxlength="4">
+        <button id="joinRoom">Join Room</button>
+      </div>
+      <div class="message">One player creates a room. Everyone else joins from their own phone with the room code.</div>
+    </section>
+
+    <section class="panel hidden" id="lobbyPanel">
+      <div>Room code</div>
+      <div class="room-code" id="roomCode"></div>
+      <div class="message" id="lobbyMessage"></div>
+      <div class="actions">
+        <button id="addBot">Add Computer</button>
+        <button id="startGame">Start Game</button>
+      </div>
+    </section>
+
+    <section class="top hidden" id="gameTop">
+      <div class="panel">
+        <div class="zone-label">Draw Deck</div>
+        <div class="row"><div class="card back">SH</div><strong id="drawCount"></strong></div>
+      </div>
+      <div class="panel">
+        <div class="zone-label">Discard Pile</div>
+        <div class="row" id="pileRow"></div>
+        <strong id="pileInfo"></strong>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="actionPanel">
+      <div class="actions">
+        <button id="doneSetup">Done Setup</button>
+        <button id="playSelected">Play Selected</button>
+        <button id="pickupPile" class="danger">Pick Up Pile</button>
+      </div>
+      <div class="message" id="message"></div>
+    </section>
+
+    <section class="players" id="players"></section>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let state = null;
+    let selected = [];
+    let swapFirst = null;
+
+    const el = {
+      setupPanel: document.querySelector("#setupPanel"),
+      lobbyPanel: document.querySelector("#lobbyPanel"),
+      gameTop: document.querySelector("#gameTop"),
+      actionPanel: document.querySelector("#actionPanel"),
+      roomBadge: document.querySelector("#roomBadge"),
+      roomCode: document.querySelector("#roomCode"),
+      lobbyMessage: document.querySelector("#lobbyMessage"),
+      nameInput: document.querySelector("#nameInput"),
+      roomInput: document.querySelector("#roomInput"),
+      drawCount: document.querySelector("#drawCount"),
+      pileRow: document.querySelector("#pileRow"),
+      pileInfo: document.querySelector("#pileInfo"),
+      message: document.querySelector("#message"),
+      players: document.querySelector("#players"),
+      doneSetup: document.querySelector("#doneSetup"),
+      playSelected: document.querySelector("#playSelected"),
+      pickupPile: document.querySelector("#pickupPile"),
+      addBot: document.querySelector("#addBot"),
+      startGame: document.querySelector("#startGame")
+    };
+
+    document.querySelector("#createRoom").addEventListener("click", () => socket.emit("createRoom", { name: el.nameInput.value }));
+    document.querySelector("#joinRoom").addEventListener("click", () => socket.emit("joinRoom", { code: el.roomInput.value, name: el.nameInput.value }));
+    el.addBot.addEventListener("click", () => socket.emit("addBot"));
+    el.startGame.addEventListener("click", () => socket.emit("startGame"));
+    el.doneSetup.addEventListener("click", () => { swapFirst = null; socket.emit("doneSetup"); });
+    el.playSelected.addEventListener("click", () => {
+      if (!selected.length) return;
+      socket.emit("play", { zone: selected[0].zone, indexes: selected.map(item => item.index) });
+      selected = [];
+    });
+    el.pickupPile.addEventListener("click", () => socket.emit("pickup"));
+
+    socket.on("state", next => {
+      state = next;
+      selected = selected.filter(item => currentPlayer() && item.zone === currentPlayer().activeZone);
+      render();
+    });
+    socket.on("errorMessage", text => alert(text));
+
+    function currentPlayer() {
+      return state?.players[state.current];
+    }
+
+    function me() {
+      return state?.players[state.viewerIndex];
+    }
+
+    function isMyTurn() {
+      return state && state.phase === "play" && state.viewerIndex === state.current;
+    }
+
+    function isMySetup() {
+      return state && state.phase === "setup" && state.viewerIndex === state.setupIndex;
+    }
+
+    function render() {
+      if (!state) return;
+      el.setupPanel.classList.add("hidden");
+      el.roomBadge.textContent = `Room ${state.code}`;
+      el.roomCode.textContent = state.code;
+      el.lobbyPanel.classList.toggle("hidden", state.phase !== "lobby");
+      el.gameTop.classList.toggle("hidden", state.phase === "lobby");
+      el.actionPanel.classList.toggle("hidden", state.phase === "lobby");
+      el.lobbyMessage.textContent = `${state.players.length}/4 players. Share code ${state.code}.`;
+      el.addBot.disabled = state.viewerId !== state.hostId || state.players.length >= 4;
+      el.startGame.disabled = state.viewerId !== state.hostId || state.players.length < 2;
+
+      el.drawCount.textContent = `${state.drawCount} cards`;
+      el.pileRow.innerHTML = state.topCard ? cardNode(state.topCard).outerHTML : `<div class="card back">Clear</div>`;
+      el.pileInfo.textContent = state.topCard ? `${state.pileCount} in pile. Top: ${state.topCard.label}` : "Empty";
+      el.message.textContent = state.message;
+      el.doneSetup.classList.toggle("hidden", !isMySetup());
+      el.playSelected.classList.toggle("hidden", state.phase !== "play");
+      el.pickupPile.classList.toggle("hidden", state.phase !== "play");
+      el.playSelected.disabled = !isMyTurn() || !selected.length;
+      el.pickupPile.disabled = !isMyTurn() || !state.pileCount;
+
+      el.players.innerHTML = "";
+      for (const [index, player] of state.players.entries()) {
+        el.players.appendChild(playerPanel(player, index));
+      }
+    }
+
+    function playerPanel(player, playerIndex) {
+      const section = document.createElement("section");
+      section.className = "panel player";
+      if (playerIndex === state.current && state.phase === "play") section.classList.add("active");
+      if (playerIndex === state.viewerIndex) section.classList.add("me");
+      section.innerHTML = `
+        <div class="player-head">
+          <div class="name">${player.name}${player.bot ? " (Computer)" : ""}</div>
+          <div class="counts">Hand ${player.hand.length} | Up ${player.faceUp.length} | Down ${player.faceDown.length}</div>
+        </div>
+        <div class="zone-label">Face Up</div>
+        <div class="row faceUp"></div>
+        <div class="zone-label">${playerIndex === state.viewerIndex ? "Hand" : "Hand Count"}</div>
+        <div class="row hand"></div>
+        <div class="zone-label">Face Down</div>
+        <div class="row faceDown"></div>
+      `;
+      fillRow(section.querySelector(".faceUp"), player.faceUp, playerIndex, "faceUp");
+      fillRow(section.querySelector(".hand"), player.hand, playerIndex, "hand");
+      fillRow(section.querySelector(".faceDown"), player.faceDown, playerIndex, "faceDown");
+      return section;
+    }
+
+    function fillRow(row, cards, playerIndex, zone) {
+      for (const [index, card] of cards.entries()) {
+        const node = card.hidden ? cardBack() : cardNode(card);
+        const mine = playerIndex === state.viewerIndex;
+        const selectableSetup = isMySetup() && mine && (zone === "hand" || zone === "faceUp");
+        const selectablePlay = isMyTurn() && mine && zone === me().activeZone;
+        if (selectableSetup || selectablePlay) {
+          node.classList.add("selectable");
+          node.addEventListener("click", () => selectableSetup ? selectSwap(zone, index) : selectPlay(zone, index, card));
+        }
+        if (isSelected(zone, index) || isSwapSelected(zone, index)) node.classList.add("selected");
+        row.appendChild(node);
+      }
+    }
+
+    function selectSwap(zone, index) {
+      if (!swapFirst) {
+        swapFirst = { zone, index };
+        render();
+        return;
+      }
+      if (swapFirst.zone === zone && swapFirst.index === index) {
+        swapFirst = null;
+        render();
+        return;
+      }
+      if (swapFirst.zone === zone) {
+        swapFirst = { zone, index };
+        render();
+        return;
+      }
+      socket.emit("swapSetup", { first: swapFirst, second: { zone, index } });
+      swapFirst = null;
+    }
+
+    function selectPlay(zone, index, card) {
+      if (zone === "faceDown") {
+        selected = [{ zone, index }];
+        render();
+        return;
+      }
+      const already = selected.some(item => item.zone === zone && item.index === index);
+      if (already) selected = selected.filter(item => !(item.zone === zone && item.index === index));
+      else if (!selected.length || selected[0].rank === card.rank) selected.push({ zone, index, rank: card.rank });
+      else selected = [{ zone, index, rank: card.rank }];
+      render();
+    }
+
+    function isSelected(zone, index) {
+      return selected.some(item => item.zone === zone && item.index === index);
+    }
+
+    function isSwapSelected(zone, index) {
+      return swapFirst && swapFirst.zone === zone && swapFirst.index === index;
+    }
+
+    function cardNode(card) {
+      const img = document.createElement("img");
+      img.className = "card";
+      img.src = card.img;
+      img.alt = `${card.rank} of ${card.suit}`;
+      img.draggable = false;
+      return img;
+    }
+
+    function cardBack() {
+      const div = document.createElement("div");
+      div.className = "card back";
+      div.textContent = "SH";
+      return div;
+    }
+  </script>
+</body>
+</html>
