@@ -18,6 +18,14 @@ npm start
 
 Then open `http://localhost:3000`.
 
+On Windows, the easiest local launcher is:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\start-game.ps1
+```
+
+It starts or reuses the server, opens the PC page, and prints the phone URL for devices on the same Wi-Fi.
+
 To play from phones, deploy the Node app to a host such as Render, Railway, Fly.io, or a VPS. GitHub Pages cannot run the multiplayer server by itself.
 
 ## Online Multiplayer
